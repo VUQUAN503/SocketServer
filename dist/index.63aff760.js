@@ -623,40 +623,46 @@ const token = new (0, _room.SkyWayAuthToken)({
     const channelNameInput = document.getElementById("channel-name");
     const joinButton = document.getElementById("join");
     const audio = await (0, _room.SkyWayStreamFactory).createMicrophoneAudioStream();
+    let me;
+    let channel;
     mute.onclick = ()=>{
         if (audio.isEnabled) mute.innerText = "UnMute";
         else mute.innerText = "Mute";
         audio.setEnabled(!audio.isEnabled);
     };
     joinButton.onclick = async ()=>{
-        if (channelNameInput.value === "") return;
-        const context = await (0, _room.SkyWayContext).Create(token);
-        const channel = await (0, _room.SkyWayRoom).FindOrCreate(context, {
-            type: "sfu",
-            name: channelNameInput.value
-        });
-        const me = await channel.join();
-        await me.publish(audio);
-        const subscribeAndAttach = async (publication)=>{
-            if (publication.publisher.id === me.id) return;
-            const subscribeButton = document.createElement("button");
-            subscribeButton.textContent = `${publication.publisher.id}: ${publication.contentType}`;
-            buttonArea.appendChild(subscribeButton);
-            const { stream , subscription  } = await me.subscribe(publication.id);
-            switch(stream.contentType){
-                case "audio":
-                    {
-                        const elm = document.createElement("audio");
-                        elm.controls = true;
-                        elm.autoplay = true;
-                        stream.attach(elm);
-                        remoteMediaArea.appendChild(elm);
-                    }
-                    break;
-            }
-        };
-        channel.publications.forEach(subscribeAndAttach);
-        channel.onStreamPublished.add((e)=>subscribeAndAttach(e.publication));
+        if (joinButton.innerText === "Join") {
+            joinButton.innerText = "Leave";
+            if (channelNameInput.value === "") return;
+            const context = await (0, _room.SkyWayContext).Create(token);
+            channel = await (0, _room.SkyWayRoom).FindOrCreate(context, {
+                type: "sfu",
+                name: channelNameInput.value
+            });
+            me = await channel.join();
+            await me.publish(audio);
+            const subscribeAndAttach = async (publication)=>{
+                if (publication.publisher.id === me.id) return;
+                const { stream , subscription  } = await me.subscribe(publication.id);
+                switch(stream.contentType){
+                    case "audio":
+                        {
+                            const elm = document.createElement("audio");
+                            elm.controls = true;
+                            elm.hidden = true;
+                            elm.autoplay = true;
+                            stream.attach(elm);
+                            remoteMediaArea.appendChild(elm);
+                        }
+                        break;
+                }
+            };
+            channel.publications.forEach(subscribeAndAttach);
+            channel.onStreamPublished.add((e)=>subscribeAndAttach(e.publication));
+        } else {
+            channel.leave(me);
+            joinButton.innerText = "Join";
+        }
     };
 })();
 
